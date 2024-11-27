@@ -1,3 +1,3 @@
 @echo off
-python AdvanchedScanner.py
+python AdvancedScanner.py
 pause
