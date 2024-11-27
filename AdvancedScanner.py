@@ -1,11 +1,11 @@
 import requests
 from bs4 import BeautifulSoup
 import whois
-import nmap
 from urllib.parse import urljoin, urlparse
 import json
 from colorama import Fore, Style, init
 import time
+import socket
 import sys
 
 # Initialize colorama for colorful output
@@ -39,9 +39,29 @@ def save_results_to_file(data, filename, file_format="txt"):
     else:
         print(f"{Fore.RED}Unsupported file format: {file_format}")
 
+# Perform a port scan using the custom socket-based function
+def perform_port_scan(hostname, start_port=1, end_port=1024):
+    """
+    Eine einfache Port-Scan-Funktion, die offene Ports auf einem Host überprüft.
+    """
+    open_ports = []
+    print(f"\n{Fore.YELLOW}{'-'*20} Starting Port Scan {'-'*20}")
+    print(f"Scanning ports {start_port}-{end_port} on {hostname}...\n")
+
+    for port in range(start_port, end_port + 1):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(1)  # Setzt ein Timeout von 1 Sekunde
+            result = sock.connect_ex((hostname, port))
+            if result == 0:  # Port ist offen
+                print(f"  {Fore.LIGHTGREEN_EX}Port {port} is open.")
+                open_ports.append(port)
+
+    print(f"\n{Fore.GREEN}Scanning completed. Open ports: {open_ports}")
+    return open_ports
+
 def scan_website(url):
     # Initialization screen
-    loading_screen("Initializing Advanced Port and Website Scanner", 3)
+    loading_screen("Initializing Advanced Website and Port Scanner", 3)
 
     url = validate_url(url)
     print(f"{Fore.BLUE}{'-'*40}")
@@ -114,27 +134,24 @@ def scan_website(url):
         except Exception as e:
             print(f"{Fore.RED}❌ Whois lookup failed. Error: {e}")
 
+    # Ask the user whether they want to scan all ports
+    scan_all_ports = input(f"{Fore.YELLOW}Do you want to scan all ports (1-65535)? This may take a long time. (yes/no): ").strip().lower()
+    
+    # Decide the port range based on user input
+    if scan_all_ports in ["yes", "y"]:
+        start_port = 1
+        end_port = 65535
+    else:
+        start_port = 1
+        end_port = 1024
 
-    # Perform a port scan using nmap
-    print(f"\n{Fore.YELLOW}{'-'*20} Starting Port Scan {'-'*20}")
-    nm = nmap.PortScanner()
-    try:
-        nm.scan(urlparse(url).hostname, '1-1024', '-T4')
-        for host in nm.all_hosts():
-            host_result = {"host": host, "state": nm[host].state(), "ports": []}
-            print(f"\n{Fore.BLUE}Host: {Fore.LIGHTGREEN_EX}{host} ({nm[host].hostname()})")
-            print(f"  State: {Fore.LIGHTGREEN_EX}{nm[host].state()}")
-            for proto in nm[host].all_protocols():
-                for port in nm[host][proto]:
-                    port_info = {
-                        "port": port,
-                        "state": nm[host][proto][port]['state']
-                    }
-                    host_result["ports"].append(port_info)
-                    print(f"    {Fore.LIGHTGREEN_EX}Port: {port}\tState: {nm[host][proto][port]['state']}")
-            scan_results["ports"].append(host_result)
-    except Exception as e:
-        print(f"{Fore.RED}❌ Port scan failed. Error: {e}")
+    # Perform a port scan using the custom socket-based function
+    hostname = urlparse(url).hostname
+    if hostname:
+        open_ports = perform_port_scan(hostname, start_port, end_port)
+        scan_results["ports"] = open_ports
+    else:
+        print(f"{Fore.RED}❌ Unable to resolve hostname for the URL.")
 
     # Ask the user to save the results
     save_option = input(f"\n{Fore.YELLOW}Do you want to save the results? (yes/no): ").strip().lower()
@@ -151,3 +168,9 @@ if __name__ == "__main__":
     print(f"{Fore.LIGHTCYAN_EX}Welcome to the Advanced Website and Port Scanner!")
     target_url = input(f"{Fore.YELLOW}Enter the website URL to scan: ").strip()
     scan_website(target_url)
+
+    # Completion message
+    print(f"\n{Fore.GREEN}Thanks for using! Please give us a ⭐ on GitHub!")
+
+    # Halt the script from closing immediately
+    input(f"\n{Fore.CYAN}Press Enter to exit...")
